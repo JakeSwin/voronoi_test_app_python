@@ -3,11 +3,7 @@ import pyray as pr
 from pyray import ffi
 import numpy as np
 import PIL.Image as Image
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('QtAgg')
 
-from itertools import chain
 from skimage.draw import polygon2mask
 from pykrige.ok import OrdinaryKriging
 
@@ -17,7 +13,6 @@ COLOUR_2 = [255, 255, 0]
 SHOW_LINES = True
 SHOW_COLOURS = False
 SHOW_POINTS = True
-#COLOUR_PALETTE = list(chain.from_iterable([interpolate(COLOUR_1, COLOUR_2, i/255) for i in range(256)]))
 
 pr.init_window(WINDOW_SIZE, WINDOW_SIZE, "Weighted Voronoi GP")
 pr.set_target_fps(30)
@@ -64,7 +59,7 @@ def generate_points(num_points, prob_map, gp_size):
     return np.column_stack((Xs, Ys))
 
 if __name__ == "__main__":
-    im = Image.open("/Users/swin/code/python/voronoi/000/groundtruth/first000_gt.png")
+    im = Image.open("/home/swin/code/python/voronoi/000/groundtruth/first000_gt.png")
     width, height = im.size
     crop_size = 150
     num_samples = 2000
@@ -88,11 +83,6 @@ if __name__ == "__main__":
     gridy = np.arange(0, width, 40, dtype='float64')
     zstar, ss = OK.execute("grid", gridx, gridy)
     normalized_zstar = (zstar.data - np.min(zstar.data)) / (np.max(zstar.data) - np.min(zstar.data))
-    # fig = plt.figure()
-    # cax = plt.imshow(normalized_zstar)
-    # ax = plt.gca()
-    # cbar = plt.colorbar(cax)
-    # plt.show()
     # GP size
     gp_size = zstar.data.shape[0]
 
@@ -110,16 +100,15 @@ if __name__ == "__main__":
 
     # Create resized image for display with raylib
     resized_im = im.resize((WINDOW_SIZE, WINDOW_SIZE))
-    # colors = [pr.Color for _ in range(WINDOW_SIZE * WINDOW_SIZE)]
     colors = ffi.new("Color[]", WINDOW_SIZE * WINDOW_SIZE)
-    
+
     # Convert pixel data
     pixels = resized_im.load()
     for y in range(WINDOW_SIZE):
         for x in range(WINDOW_SIZE):
             r, g, b = pixels[x, y]
             colors[y * WINDOW_SIZE + x] = pr.Color(r, g, b, 255)
-    
+
     # Create raylib Image
     raylib_image = pr.Image(
         colors,
@@ -130,9 +119,8 @@ if __name__ == "__main__":
     )
 
     texture = pr.load_texture_from_image(raylib_image)
-    # pr.unload_image(raylib_image)
 
-    point_increase_ratio = WINDOW_SIZE / gp_size 
+    point_increase_ratio = WINDOW_SIZE / gp_size
 
     while not pr.window_should_close():
         if pr.is_key_pressed(pr.KEY_R):
@@ -171,20 +159,7 @@ if __name__ == "__main__":
             y_idxs, x_idxs = np.where(masks[j])
             masked_values = np.expand_dims(normalized_zstar[masks[j]], axis=1)
             masked_values[masked_values < 0] = 0
-            # masked_values = masked_values**-1
-            # masked_values = 1 - masked_values
-            # if masked_values.size > 0:
-                # masked_values = (masked_values - np.min(masked_values)) / (np.max(masked_values) - np.min(masked_values))
-
-            # Combine into array of (y, x, value) tuples
-            # result = np.column_stack((y_idxs, x_idxs, masked_values))
-            # result = np.append(image_to_point_transform(x_idxs, y_idxs, gp_size), masked_values, axis=1)
-            # total_weight = np.sum(result[:, 2])
             coords = image_to_point_transform(x_idxs, y_idxs, gp_size)
-            # masked_values = np.column_stack((
-            #     np.where(coords[:, 0] < centroid[0], -masked_values.flatten(), masked_values.flatten()),
-            #     np.where(coords[:, 1] < centroid[1], -masked_values.flatten(), masked_values.flatten())
-            # ))
             result = np.append(coords, masked_values, axis=1)
 
             total_weight = np.sum(masked_values)
@@ -194,20 +169,10 @@ if __name__ == "__main__":
             else:
                 avg_weights[j] = 0.0
 
-
-            # for point in result:
-            #   centroid[0] += (point[0] * point[2])
-            #   centroid[1] += (point[1] * point[2])
-
             if total_weight > 0:
-            # centroid /= total_weight
-            # w_centroids[i] = centroid
-                #w_centroids[j] = (centroid + np.sum(coords * masked_values, axis=0)) / total_weight
                 w_centroids[j] = np.sum(coords * masked_values, axis=0) / total_weight
             else:
                 w_centroids[j] = points[j][0:2]
-
-            # print(f"Iter: i"w_centroids[i])
 
         pr.begin_drawing()
         pr.clear_background(pr.RAYWHITE)
@@ -241,17 +206,5 @@ if __name__ == "__main__":
         # Compute new points through linear interpolation
         points = np.array([p1 + 0.1 * (p2 - p1) for p1, p2 in zip(points[:, 0:2], w_centroids)])
         points = np.append(points, np.zeros((len(points),1)), axis=1)
-    
-    pr.close_window()
 
-    # # Plot the results
-    # plt.figure(figsize=(10, 10))
-    # ax = plt.gca()
-    # voro.plot(ax=ax, cmap="RdBu")
-    # ax.scatter(points[:, 0], points[:, 1], s=2, c="k")
-    # ax.scatter(original_points[:, 0], original_points[:, 1], s=2, c="g")
-    # ax.scatter(centroids[:, 0], centroids[:, 1], s=2, c="r")
-    # ax.scatter(w_centroids[:, 0], w_centroids[:, 1], s=2, c="b")
-    # cax = ax.imshow(normalized_zstar, extent=(-gp_size/2, gp_size/2, -gp_size/2, gp_size/2))
-    # cbar = plt.colorbar(cax)
-    # plt.show()
+    pr.close_window()
